@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
-
 // GET endpoint: Consumed by SWR on the React Frontend to power floating dials
 export async function GET() {
     try {
-        const latest = await prisma.telemetry.findFirst({
-            orderBy: { timestamp: 'desc' },
-        });
+        if (process.env.DATABASE_URL) {
+            const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL } as any);
+            const latest = await prisma.telemetry.findFirst({
+                orderBy: { timestamp: 'desc' },
+            });
+            if (latest) return NextResponse.json(latest);
+        }
 
-        // Antigravity fallback if database is empty initially
-        if (!latest) return NextResponse.json({ cpuTemp: 44.5, loadAvg: 1.2, ramUsage: 16.4 });
-        return NextResponse.json(latest);
+        // Antigravity fallback if database is empty initially or not configured
+        return NextResponse.json({ cpuTemp: 44.5, loadAvg: 1.2, ramUsage: 16.4 });
     } catch (error) {
         return NextResponse.json({ cpuTemp: 44.5, loadAvg: 1.2, ramUsage: 16.4 });
     }
@@ -28,16 +29,19 @@ export async function POST(request: Request) {
 
     try {
         const data = await request.json();
-        const telemetry = await prisma.telemetry.create({
-            data: {
-                node: data.node,
-                cpuTemp: data.cpuTemp,
-                loadAvg: data.loadAvg,
-                ramUsage: data.ramUsage,
-            }
-        });
-
-        return NextResponse.json({ success: true, telemetry });
+        if (process.env.DATABASE_URL) {
+            const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL } as any);
+            const telemetry = await prisma.telemetry.create({
+                data: {
+                    node: data.node,
+                    cpuTemp: data.cpuTemp,
+                    loadAvg: data.loadAvg,
+                    ramUsage: data.ramUsage,
+                }
+            });
+            return NextResponse.json({ success: true, telemetry });
+        }
+        return NextResponse.json({ success: true, telemetry: data });
     } catch (error) {
         return NextResponse.json({ error: 'Malformed payload' }, { status: 400 });
     }
