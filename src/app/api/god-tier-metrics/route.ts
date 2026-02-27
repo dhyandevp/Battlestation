@@ -107,7 +107,7 @@ async function fetchOllamaStats() {
         const json: any = await res.json();
         if (json.models && json.models.length > 0) {
             let vram = 0;
-            for (let m of json.models) vram += m.size_vram || 0;
+            for (const m of json.models) vram += m.size_vram || 0;
             return { vramUsage: (vram / (1024 * 1024 * 1024)) || 14.2 }; // return GB
         }
     } catch (e) {
@@ -144,7 +144,7 @@ async function fetchLokiLogs() {
         const json: any = await res.json();
 
         if (json.data && json.data.result.length > 0) {
-            let logs: { level: string; text: string; }[] = [];
+            const logs: { level: string; text: string; }[] = [];
             json.data.result.forEach((stream: any) => {
                 const lbls = stream.stream;
                 stream.values.forEach((val: [string, string]) => {
