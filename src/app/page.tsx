@@ -24,7 +24,7 @@ export default function GodTierCommandCenter() {
   const [chaosActive, setChaosActive] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
-  // Mocked state for our massive God-Tier Dashboard
+  // Real state powered by the Middleware Aggregator
   const [sysStats, setSysStats] = useState({
     upsWatts: 450,
     costPerKwh: 0.14,
@@ -33,6 +33,7 @@ export default function GodTierCommandCenter() {
     wanDown: 854,
     wanUp: 122,
     dnsBlocked: '18.4%',
+    failedLogins: 3,
     activeTranscodes: 2,
     vramUsage: 14.2
   });
@@ -42,17 +43,24 @@ export default function GodTierCommandCenter() {
     setTime(new Date());
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
-    // Simulate real-time polling to the Middleware Aggregator
-    const metricTimer = setInterval(() => {
-      if (!maintenanceMode) {
-        setSysStats(prev => ({
-          ...prev,
-          upsWatts: prev.upsWatts + (Math.random() * 20 - 10),
-          pveCpu: Math.min(100, Math.max(0, prev.pveCpu + (Math.random() * 10 - 5))),
-          wanDown: Math.abs(prev.wanDown + (Math.random() * 100 - 50)),
-        }));
+    // Real-time polling to the Node Middleware Aggregator
+    const fetchMetrics = async () => {
+      if (maintenanceMode) return;
+      try {
+        const res = await fetcher('/api/god-tier-metrics');
+        if (res?.success && res.data) {
+          setSysStats(prev => ({ ...prev, ...res.data }));
+          if (res.data.chaosActive !== undefined) {
+            setChaosActive(res.data.chaosActive);
+          }
+        }
+      } catch (e) {
+        console.error("Middleware fetch failed", e);
       }
-    }, 2000);
+    };
+
+    fetchMetrics(); // Initial fetch
+    const metricTimer = setInterval(fetchMetrics, 2000);
 
     return () => {
       clearInterval(clockTimer);
@@ -60,9 +68,16 @@ export default function GodTierCommandCenter() {
     };
   }, [maintenanceMode]);
 
-  const triggerChaos = () => {
+  const triggerChaos = async () => {
     setChaosActive(true);
-    setTimeout(() => setChaosActive(false), 5000);
+    try {
+      await fetch('/api/god-tier-metrics', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'trigger_chaos' })
+      });
+    } catch (e) {
+      console.error("Failed to trigger chaos", e);
+    }
   };
 
   const currentMonthlyCost = ((sysStats.upsWatts / 1000) * 24 * 30 * sysStats.costPerKwh).toFixed(2);
@@ -220,7 +235,7 @@ export default function GodTierCommandCenter() {
                 <GlassCard glow="rose" className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Failed SSO Logins</p>
-                    <p className="text-xl font-light text-rose-400">3 Attempts</p>
+                    <p className="text-xl font-light text-rose-400">{sysStats.failedLogins} Attempts</p>
                   </div>
                   <Shield size={24} className="text-rose-500/50" />
                 </GlassCard>
