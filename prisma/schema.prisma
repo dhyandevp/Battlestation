@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  name      String   @unique  // e.g., "Proxmox", "Pi-hole", "Portainer"
+  status    String            // "online", "offline", "degraded"
+  uptime    Int               // tracked in seconds
+  updatedAt DateTime @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String            // "info", "alert", "success"
+  message   String
+  source    String            // e.g., "SSH", "Docker", "User Action"
+  createdAt DateTime @default(now())
+}
+
+model ContainerStatus {
+  id          String   @id @default(cuid())
+  containerId String   @unique
+  name        String
+  state       String        // "running", "exited", "paused"
+  cpuUsage    Float
+  memUsage    Float
+  updatedAt   DateTime @updatedAt
+}
+
+model Telemetry {
+  id        String   @id @default(cuid())
+  node      String            // e.g., "pve-01"
+  cpuTemp   Float
+  loadAvg   Float
+  ramUsage  Float
+  timestamp DateTime @default(now())
+}
