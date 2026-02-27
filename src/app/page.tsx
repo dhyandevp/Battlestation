@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
 import {
   Bell, Activity, Lock, Zap, Thermometer, Database, Cpu,
-  ChevronRight, MoreHorizontal, LayoutGrid, CheckCircle2, Circle, Plus, Server, Home, Shield, Settings, Calendar as CalendarIcon, Power, HardDrive
+  ChevronRight, MoreHorizontal, LayoutGrid, CheckCircle2, Circle, Plus, Server, Home, Shield, Settings, Calendar as CalendarIcon, Power, HardDrive, LogOut, User
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -38,6 +38,7 @@ export default function CommandCenter() {
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState<Date | null>(null);
   const [tasks, setTasks] = useState(INITIAL_TASKS);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -149,6 +150,30 @@ export default function CommandCenter() {
             <button className="text-zinc-400 hover:text-white transition w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900/80 border border-zinc-800">
               <Bell size={18} />
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              >
+                <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-500 opacity-80" />
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#0a0a0a] border border-zinc-800 rounded-xl shadow-2xl py-2 z-50 flex flex-col origin-top-right animate-in fade-in slide-in-from-top-2">
+                  <div className="px-4 py-2 border-b border-zinc-800/50 mb-1">
+                    <p className="text-sm font-bold text-white">Administrator</p>
+                    <p className="text-xs text-zinc-500">admin@local.host</p>
+                  </div>
+                  <button className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors flex items-center gap-2">
+                    <User size={14} /> Profile Settings
+                  </button>
+                  <button className="w-full text-left px-4 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-2">
+                    <LogOut size={14} /> Disconnect Session
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Mobile Only Clock */}
@@ -164,7 +189,7 @@ export default function CommandCenter() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <MetricSummary title="Uplink Traffic" value="842 Mbps" trend="+12%" positive />
             <MetricSummary title="System Load" value={`${metrics?.loadAvg || '1.24'}`} sub="Proxmox Node" />
-            <MetricSummary title="Core Thermal" value={`${metrics?.cpuTemp || 45}°C`} sub="Stable Cooling" />
+            <ThermalsGauge value={metrics?.cpuTemp || 45} />
             <MetricSummary title="DNS Queries" value="142k" trend="12% Blocked" positive={false} />
           </div>
 
@@ -236,7 +261,7 @@ export default function CommandCenter() {
 
               {/* Infrastructure Gateways - Toggles */}
               <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-6 border border-zinc-900 shadow-xl flex flex-col gap-3 flex-1">
-                <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
+                <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2 select-none">
                   <Shield size={18} className="text-indigo-500" /> Active Tunnels
                 </h3>
                 <ToggleNode title="Nginx Proxy Entry" active={toggles.proxy} onClick={() => executeAction('proxy')} />
@@ -345,10 +370,94 @@ function MetricSummary({ title, value, trend, sub, positive }: { title: string, 
 
 function ToggleNode({ title, active, onClick }: { title: string, active: boolean, onClick: () => void }) {
   return (
-    <div onClick={onClick} className="flex items-center justify-between p-3.5 rounded-2xl bg-[#050505] border border-zinc-900 hover:border-zinc-800 cursor-pointer transition-all group">
+    <div onClick={onClick} className="flex items-center justify-between p-3.5 rounded-2xl bg-[#050505] border border-zinc-900 hover:border-zinc-800 cursor-pointer transition-all group select-none">
       <span className={cn("text-sm font-bold transition-colors", active ? "text-white" : "text-zinc-500 group-hover:text-zinc-400")}>{title}</span>
       <div className={cn("w-12 h-6 rounded-full relative transition-colors duration-300 flex items-center px-1 border", active ? "bg-indigo-600 border-indigo-500" : "bg-zinc-900 border-zinc-800")}>
         <div className={cn("w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300", active ? "translate-x-6" : "translate-x-0 bg-zinc-600")} />
+      </div>
+    </div>
+  );
+}
+
+function ThermalsGauge({ value }: { value: number }) {
+  // SVG Arc length math for 180 degree semi-circle
+  const maxStroke = 283;
+  // Map 0-100 to the stroke dashoffset (100 = full arc = 0 offset, 0 = empty arc = maxStroke offset)
+  const offset = maxStroke - (maxStroke * Math.min(Math.max(value, 0), 100) / 100);
+
+  return (
+    <div className="bg-[#0a0a0a] rounded-[20px] p-5 md:p-6 border border-zinc-900 flex flex-col justify-between shadow-lg relative overflow-hidden h-full min-h-[160px]">
+      <div className="flex justify-between items-start mb-2 relative z-10 text-[10px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest">
+        <span>Core Thermal</span>
+        <span className="text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded">Stable</span>
+      </div>
+
+      {/* SVG Dial Chart */}
+      <div className="relative w-full aspect-[2/1] flex items-end justify-center mt-auto">
+        <svg viewBox="0 0 200 100" className="w-full h-auto overflow-visible" aria-hidden="true">
+          {/* Background Track Arc */}
+          <path d="M 10 95 A 90 90 0 0 1 190 95" fill="none" stroke="#18181b" strokeWidth="8" strokeLinecap="round" />
+
+          {/* Tick Marks (0 to 100 in steps of 10 = 11 ticks mapped across 180 degrees) */}
+          {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((tickValue) => {
+            // Convert value to angle (-180 to 0)
+            const angle = -180 + (tickValue / 100) * 180;
+            const rad = (angle * Math.PI) / 180;
+            // Center coordinates
+            const cx = 100;
+            const cy = 95;
+            // Tick length bounds
+            const innerRadius = 75;
+            const outerRadius = 82;
+
+            const x1 = cx + innerRadius * Math.cos(rad);
+            const y1 = cy + innerRadius * Math.sin(rad);
+            const x2 = cx + outerRadius * Math.cos(rad);
+            const y2 = cy + outerRadius * Math.sin(rad);
+
+            const isMajor = tickValue % 25 === 0;
+            return (
+              <line
+                key={tickValue}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={tickValue >= 80 ? "#f43f5e" : "#3f3f46"}
+                strokeWidth={isMajor ? "2" : "1"}
+                strokeLinecap="round"
+              />
+            );
+          })}
+
+          {/* Active Colored Arc */}
+          <path
+            d="M 10 95 A 90 90 0 0 1 190 95"
+            fill="none"
+            stroke="url(#thermalGaugeGradient)"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={maxStroke}
+            strokeDashoffset={offset}
+            className="transition-all duration-1000 ease-out"
+          />
+          {/* Defs for dynamic gradient rendering inside SVG */}
+          <defs>
+            <linearGradient id="thermalGaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8b5cf6" /> {/* Purple */}
+              <stop offset="50%" stopColor="#ec4899" /> {/* Pink */}
+              <stop offset="100%" stopColor="#f43f5e" /> {/* Rose */}
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Dynamic Number Value in Center */}
+        <div className="absolute bottom-[-10px] w-full flex flex-col items-center">
+          <span className="text-3xl md:text-4xl font-light text-white tracking-tighter tabular-nums drop-shadow-lg">
+            {value}<span className="text-zinc-500 font-medium text-xl ml-0.5">&deg;C</span>
+          </span>
+        </div>
+
+        {/* Min/Max indicators */}
+        <div className="absolute bottom-0 left-1 text-[10px] font-bold text-zinc-600">0&deg;</div>
+        <div className="absolute bottom-0 right-1 text-[10px] font-bold text-rose-500/70">100&deg;</div>
       </div>
     </div>
   );
