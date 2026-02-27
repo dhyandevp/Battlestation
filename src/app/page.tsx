@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import {
-  Bell, Activity, Lock, Zap, Thermometer, Database, Cpu,
-  ChevronRight, MoreHorizontal, LayoutGrid, CheckCircle2, Circle, Plus, Server, Home, Shield, Settings, Calendar as CalendarIcon, Power, HardDrive, LogOut, User
+  Server, Shield, Cpu, Activity, Zap, Film,
+  Database, Bell, Wrench, Settings, Search,
+  PlayCircle, Clock, AlertTriangle, PowerOff, PauseCircle, CheckCircle2,
+  Thermometer, HardDrive, Wifi, Lock, Eye, Calendar
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -13,452 +15,406 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Simulated God-Tier API Fetcher
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const INITIAL_TASKS = [
-  { id: 1, text: "Update Pi-hole blocklists", done: false },
-  { id: 2, text: "Check Proxmox backup logs", done: true },
-  { id: 3, text: "Renew SSL certificates", done: false },
-  { id: 4, text: "Monitor Tailscale nodes", done: false },
-];
-
-const HOSTED_APPS = [
-  { name: "Pi-hole", status: "Active", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-  { name: "Home Assistant", status: "Active", color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
-  { name: "Portainer", status: "Active", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
-  { name: "Uptime Kuma", status: "Warning", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-  { name: "Nginx Proxy", status: "Active", color: "text-teal-400 bg-teal-500/10 border-teal-500/20" },
-  { name: "Tailscale", status: "Active", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20" },
-];
-
-export default function CommandCenter() {
-  const [metrics, setMetrics] = useState<any>(null);
-  const [toggles, setToggles] = useState({ proxy: true, dns: true, vpn: false });
-
+export default function GodTierCommandCenter() {
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState<Date | null>(null);
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [chaosActive, setChaosActive] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  // Mocked state for our massive God-Tier Dashboard
+  const [sysStats, setSysStats] = useState({
+    upsWatts: 450,
+    costPerKwh: 0.14,
+    pveCpu: 45,
+    pveRam: 72,
+    wanDown: 854,
+    wanUp: 122,
+    dnsBlocked: '18.4%',
+    activeTranscodes: 2,
+    vramUsage: 14.2
+  });
 
   useEffect(() => {
     setMounted(true);
     setTime(new Date());
-
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
-    // Initial fetch
-    fetcher('/api/metrics').then(setMetrics).catch(() => { });
-    const metricsTimer = setInterval(() => {
-      fetcher('/api/metrics').then(setMetrics).catch(() => { });
-    }, 5000);
+    // Simulate real-time polling to the Middleware Aggregator
+    const metricTimer = setInterval(() => {
+      if (!maintenanceMode) {
+        setSysStats(prev => ({
+          ...prev,
+          upsWatts: prev.upsWatts + (Math.random() * 20 - 10),
+          pveCpu: Math.min(100, Math.max(0, prev.pveCpu + (Math.random() * 10 - 5))),
+          wanDown: Math.abs(prev.wanDown + (Math.random() * 100 - 50)),
+        }));
+      }
+    }, 2000);
 
     return () => {
       clearInterval(clockTimer);
-      clearInterval(metricsTimer);
+      clearInterval(metricTimer);
     };
-  }, []);
+  }, [maintenanceMode]);
 
-  const toggleTask = (id: number) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const triggerChaos = () => {
+    setChaosActive(true);
+    setTimeout(() => setChaosActive(false), 5000);
   };
 
-  const executeAction = async (actionId: string) => {
-    if (actionId === 'proxy') setToggles(p => ({ ...p, proxy: !p.proxy }));
-    if (actionId === 'dns') setToggles(p => ({ ...p, dns: !p.dns }));
-    if (actionId === 'vpn') setToggles(p => ({ ...p, vpn: !p.vpn }));
-    try {
-      await fetch('/api/docker-control', {
-        method: 'POST',
-        body: JSON.stringify({ action: actionId })
-      });
-    } catch (e) { console.error("Action failed:", e); }
-  };
+  const currentMonthlyCost = ((sysStats.upsWatts / 1000) * 24 * 30 * sysStats.costPerKwh).toFixed(2);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans flex flex-col md:flex-row overflow-hidden selection:bg-indigo-500/30">
+    <div className={cn(
+      "min-h-screen bg-[#030303] text-zinc-300 font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500/30 transition-all duration-700 relative",
+      maintenanceMode ? "grayscale opacity-80" : ""
+    )}>
 
-      {/* 
-        ==============================
-        SIDEBAR (Desktop) / BOTTOM BAR (Mobile)
-        ==============================
-      */}
-      <nav className="fixed bottom-0 w-full md:relative md:w-[240px] lg:w-[280px] bg-[#0a0a0a] border-t md:border-t-0 md:border-r border-zinc-900 flex md:flex-col justify-between md:justify-start z-50 p-4 md:p-6 md:h-screen">
-        {/* Logo - Hidden on mobile */}
-        <div className="hidden md:flex items-center gap-3 mb-10 pl-2">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
-            <Activity size={20} />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-white">Battle Station</span>
-        </div>
+      {/* Dynamic Cyber-Glass Background Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-fuchsia-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
+      {chaosActive && <div className="absolute inset-0 bg-red-600/5 z-0 pointer-events-none animate-pulse" />}
 
-        {/* Nav Links */}
-        <div className="flex md:flex-col gap-2 w-full justify-around md:justify-start">
-          <NavLink icon={<Home size={20} />} label="Dashboard" active />
-          <NavLink icon={<HardDrive size={20} />} label="Infrastructure" />
-          <NavLink icon={<CalendarIcon size={20} />} label="Schedules" />
-          <NavLink icon={<Settings size={20} />} label="Settings" />
-        </div>
-
-        {/* Bottom Action - Hidden on mobile */}
-        <div className="hidden md:flex flex-col gap-4 mt-auto">
-          <div className="p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800/80 hover:bg-zinc-900 transition-colors cursor-pointer group flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-500 to-orange-500 flex items-center justify-center">
-                <Power size={14} className="text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">System Power</p>
-                <p className="text-xs text-emerald-500 font-medium">Nominal Draw</p>
-              </div>
+      {/* HEADER: Omni-Bar */}
+      <header className="sticky top-0 z-50 px-6 py-4 border-b border-white/5 bg-[#030303]/70 backdrop-blur-2xl flex justify-between items-center shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 p-[1px] shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+            <div className="w-full h-full bg-[#030303] rounded-[11px] flex items-center justify-center">
+              <Activity size={20} className="text-cyan-400" />
             </div>
           </div>
-        </div>
-      </nav>
-
-      {/* 
-        ==============================
-        MAIN DASHBOARD CONTENT
-        ==============================
-      */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto pb-24 md:pb-0 relative">
-
-        {/* Subtle Background Glows */}
-        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none hidden md:block" />
-
-        {/* Top Header Row */}
-        <header className="px-5 py-4 md:px-10 md:py-8 flex justify-between items-center sticky top-0 bg-[#050505]/80 backdrop-blur-xl z-40 border-b border-zinc-900/50">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">Battle Station</h1>
-            <p className="text-xs md:text-sm text-zinc-500 font-medium flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-              Network Secure &middot; All nodes active
-            </p>
-          </div>
-
-          {/* BIG LIVE CLOCK */}
-          <div className="bg-zinc-900/50 px-5 py-2.5 rounded-2xl border border-zinc-800/80 hidden lg:flex items-center gap-4">
-            <div className="flex flex-col items-end">
-              <span className="text-2xl font-light tabular-nums text-white tracking-tight leading-none mb-1">
-                {mounted && time ? format(time, "HH:mm") : "--:--"}
-                <span className="text-zinc-500 font-medium ml-1 text-base">{mounted && time ? format(time, "ss") : "--"}</span>
-              </span>
-              <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-widest leading-none">
-                {mounted && time ? format(time, "EEE, MMM do") : "--"}
-              </span>
-            </div>
-            <div className="w-[1px] h-8 bg-zinc-800" />
-            <button className="text-zinc-400 hover:text-white transition w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900/80 border border-zinc-800">
-              <Bell size={18} />
-            </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-              >
-                <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-500 opacity-80" />
-              </button>
-
-              {/* Profile Dropdown Menu */}
-              {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#0a0a0a] border border-zinc-800 rounded-xl shadow-2xl py-2 z-50 flex flex-col origin-top-right animate-in fade-in slide-in-from-top-2">
-                  <div className="px-4 py-2 border-b border-zinc-800/50 mb-1">
-                    <p className="text-sm font-bold text-white">Administrator</p>
-                    <p className="text-xs text-zinc-500">admin@local.host</p>
-                  </div>
-                  <button className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors flex items-center gap-2">
-                    <User size={14} /> Profile Settings
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-2">
-                    <LogOut size={14} /> Disconnect Session
-                  </button>
-                </div>
-              )}
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase">Battle<span className="text-cyan-400">Station</span> V3</h1>
+            <div className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-zinc-500">
+              <span className={cn("w-2 h-2 rounded-full animate-pulse", maintenanceMode ? "bg-amber-500" : "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]")} />
+              {maintenanceMode ? "MAINTENANCE MODE" : "MIDDLEWARE ONLINE"}
             </div>
           </div>
-
-          {/* Mobile Only Clock */}
-          <div className="md:hidden text-right">
-            <span className="text-xl font-light text-white">{mounted && time ? format(time, "HH:mm") : "--:--"}</span>
-          </div>
-        </header>
-
-        {/* Dashboard Grid Container */}
-        <div className="p-4 md:p-8 flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
-
-          {/* Row 1: Key Summary Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            <MetricSummary title="Uplink Traffic" value="842 Mbps" trend="+12%" positive />
-            <MetricSummary title="System Load" value={`${metrics?.loadAvg || '1.24'}`} sub="Proxmox Node" />
-            <ThermalsGauge value={metrics?.cpuTemp || 45} />
-            <MetricSummary title="DNS Queries" value="142k" trend="12% Blocked" positive={false} />
-          </div>
-
-          {/* Row 2: Live View & Side Modules */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-
-            {/* Rack Live View - 8 Cols */}
-            <div className="xl:col-span-8 bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] border border-zinc-900 overflow-hidden relative min-h-[250px] md:min-h-[400px] flex flex-col shadow-xl">
-              <div className="p-4 md:p-5 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent absolute top-0 w-full z-10">
-                <div className="flex items-center gap-3">
-                  <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
-                    Server Alpha
-                  </div>
-                </div>
-                <button className="w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition backdrop-blur-md">
-                  <MoreHorizontal size={18} />
-                </button>
-              </div>
-
-              {/* Simulated Camera Feed pattern */}
-              <div className="flex-1 w-full h-full relative flex justify-center items-center bg-black/80">
-                <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] bg-[size:32px_32px]" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 md:w-48 h-32 md:h-48 border border-zinc-800/50 rounded-full flex items-center justify-center">
-                  <div className="absolute inset-0 bg-indigo-500/10 blur-[40px] rounded-full" />
-                  <div className="w-full h-[1px] bg-zinc-800/30 absolute" />
-                  <div className="h-full w-[1px] bg-zinc-800/30 absolute" />
-                  <div className="w-2 h-2 rounded-full bg-indigo-500/80 shadow-[0_0_15px_rgba(99,102,241,1)]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Task Sidebar column - 4 Cols */}
-            <div className="xl:col-span-4 flex flex-col gap-6 md:gap-6">
-
-              {/* Calendar Integration */}
-              <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-6 border border-zinc-900 shadow-xl">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <CalendarIcon size={18} className="text-indigo-500" /> Auto-Deploy
-                  </h3>
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900 px-2 py-1 rounded-md">
-                    {mounted && time ? format(time, "MMMM") : "---"}
-                  </span>
-                </div>
-                {/* Visual mini-calendar */}
-                <div className="grid grid-cols-7 gap-1 md:gap-2 text-center">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <span key={d} className="text-[10px] font-bold text-zinc-600 mb-2">{d}</span>)}
-                  {mounted && time && (() => {
-                    const start = startOfMonth(time);
-                    const end = endOfMonth(time);
-                    const days = eachDayOfInterval({ start, end });
-                    const blanks = Array(start.getDay()).fill(null);
-                    return [...blanks, ...days].map((day, i) => {
-                      if (!day) return <div key={i} className="aspect-square" />;
-                      const isToday = isSameDay(day, time);
-                      return (
-                        <div key={i} className={cn(
-                          "text-xs md:text-sm aspect-square flex items-center justify-center rounded-xl font-medium transition-all",
-                          isToday ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-110 relative z-10" : "text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
-                        )}>
-                          {format(day, "d")}
-                        </div>
-                      )
-                    })
-                  })()}
-                </div>
-              </div>
-
-              {/* Infrastructure Gateways - Toggles */}
-              <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-6 border border-zinc-900 shadow-xl flex flex-col gap-3 flex-1">
-                <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2 select-none">
-                  <Shield size={18} className="text-indigo-500" /> Active Tunnels
-                </h3>
-                <ToggleNode title="Nginx Proxy Entry" active={toggles.proxy} onClick={() => executeAction('proxy')} />
-                <ToggleNode title="Pi-Hole DNS Sink" active={toggles.dns} onClick={() => executeAction('dns')} />
-                <ToggleNode title="Tailscale Subnet" active={toggles.vpn} onClick={() => executeAction('vpn')} />
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Row 3: Bottom Sections (Services and Tasks) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            {/* Hosted Services Grid */}
-            <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-zinc-900 shadow-xl flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Database size={18} className="text-indigo-500" /> Hosted Apps
-                </h3>
-                <LayoutGrid size={18} className="text-zinc-500" />
-              </div>
-
-              {/* Mobile wrap, Desktop rigid grid */}
-              <div className="flex flex-wrap md:grid md:grid-cols-3 gap-3">
-                {HOSTED_APPS.map((app, i) => (
-                  <div key={i} className={cn(
-                    "w-[48%] md:w-auto p-4 rounded-2xl bg-[#050505] border hover:border-zinc-700 transition-colors cursor-pointer group flex flex-col items-center text-center",
-                    app.color.split("border-")[1] ? `border-${app.color.split("border-")[1]}` : "border-zinc-900"
-                  )}>
-                    <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-3", app.color.split(" border")[0])}>
-                      <Server size={20} />
-                    </div>
-                    <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors">{app.name}</p>
-                    <p className={cn("text-[10px] md:text-xs uppercase tracking-widest font-bold mt-1", app.status === 'Active' ? 'text-emerald-500/70' : 'text-amber-500/70')}>{app.status}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Maintenance Tasks Tracking */}
-            <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-zinc-900 shadow-xl flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Zap size={18} className="text-indigo-500" /> Maintenance
-                </h3>
-                <button className="text-zinc-100 bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-lg shadow-indigo-500/20">
-                  <Plus size={14} /> Add Log
-                </button>
-              </div>
-              <div className="space-y-3">
-                {tasks.map(task => (
-                  <div key={task.id} onClick={() => toggleTask(task.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#050505] border border-zinc-900 hover:border-zinc-800 cursor-pointer group transition-all">
-                    <button className="focus:outline-none flex-shrink-0">
-                      {task.done ? <CheckCircle2 size={20} className="text-emerald-500" /> : <Circle size={20} className="text-zinc-600 group-hover:text-zinc-400" />}
-                    </button>
-                    <span className={cn("text-sm transition-all", task.done ? "text-zinc-600 line-through" : "text-zinc-200 font-medium group-hover:text-white")}>{task.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
         </div>
+
+        {/* Time & Feature Toggles */}
+        <div className="flex items-center gap-6">
+          <div className="hidden lg:flex flex-col items-end">
+            <span className="text-2xl font-light tabular-nums text-white tracking-tight leading-none">
+              {mounted && time ? format(time, "HH:mm") : "--:--"}
+              <span className="text-cyan-500 font-bold ml-1 text-sm">{mounted && time ? format(time, "ss") : "--"}</span>
+            </span>
+            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mt-1">
+              {mounted && time ? format(time, "EEE, MMM do") : "--"}
+            </span>
+          </div>
+
+          <div className="h-8 w-[1px] bg-white/10 hidden md:block" />
+
+          <div className="flex gap-2">
+            {/* special features */}
+            <button
+              onClick={() => setMaintenanceMode(!maintenanceMode)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg border text-xs font-bold transition-all uppercase tracking-widest flex items-center gap-2",
+                maintenanceMode ? "bg-amber-500/20 border-amber-500/50 text-amber-500" : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+              )}
+            >
+              <PauseCircle size={14} /> Maintenance
+            </button>
+            <button
+              onClick={triggerChaos}
+              className="px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition-all uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+            >
+              <AlertTriangle size={14} /> Chaos Mode
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* SUPER GRID */}
+      <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1800px] w-full mx-auto relative z-10 space-y-6 md:space-y-8">
+
+        {/* ========================================================= */}
+        {/* TIER 1: METAL (Infrastructure)                            */}
+        {/* ========================================================= */}
+        <section>
+          <h2 className="text-sm font-bold text-cyan-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+            <Server size={18} /> Tier 1: Metal
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <GlassCard glow="cyan">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Cluster CPU</span>
+                <Cpu size={16} className="text-cyan-400" />
+              </div>
+              <div className="text-3xl font-light text-white">{sysStats.pveCpu.toFixed(1)}<span className="text-lg text-zinc-500">%</span></div>
+              <ProgressBar value={sysStats.pveCpu} color="bg-cyan-500" />
+            </GlassCard>
+
+            <GlassCard glow="cyan">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Memory (RAM)</span>
+                <Database size={16} className="text-cyan-400" />
+              </div>
+              <div className="text-3xl font-light text-white">{sysStats.pveRam}<span className="text-lg text-zinc-500">%</span></div>
+              <ProgressBar value={sysStats.pveRam} color="bg-cyan-500" />
+            </GlassCard>
+
+            <GlassCard glow="blue">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">UPS Draw</span>
+                <Zap size={16} className="text-blue-400" />
+              </div>
+              <div className="text-3xl font-light text-white tabular-nums">{sysStats.upsWatts.toFixed(0)} <span className="text-lg text-zinc-500">W</span></div>
+              <div className="text-xs text-blue-400 font-bold tracking-widest uppercase mt-2">Est. Runtime: 42m</div>
+            </GlassCard>
+
+            {/* Energy Cost Estimator */}
+            <GlassCard glow="emerald" className="bg-emerald-950/20 border-emerald-500/20">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest">Energy Cost</span>
+                <span className="text-xs font-bold text-emerald-400 border border-emerald-500/30 px-2 rounded-md bg-emerald-500/10">${sysStats.costPerKwh}/kWh</span>
+              </div>
+              <div className="text-3xl font-light text-white tabular-nums">${currentMonthlyCost}</div>
+              <div className="text-xs text-emerald-500/70 font-bold tracking-widest uppercase mt-2">Est. Monthly Total</div>
+            </GlassCard>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
+
+          {/* ========================================================= */}
+          {/* TIER 2: SHIELD (Networking & Security)                    */}
+          {/* ========================================================= */}
+          <section className="space-y-4">
+            <h2 className="text-sm font-bold text-fuchsia-500 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Shield size={18} /> Tier 2: Shield
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[calc(100%-2rem)]">
+              <GlassCard className="flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">WAN Traffic</span>
+                  <Wifi size={16} className="text-fuchsia-400" />
+                </div>
+                <div className="flex-1 flex flex-col justify-center gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Downlink</p>
+                    <p className="text-2xl font-light text-white tabular-nums">{sysStats.wanDown.toFixed(1)} <span className="text-sm text-zinc-500">Mbps</span></p>
+                    <ProgressBar value={(sysStats.wanDown / 1000) * 100} color="bg-fuchsia-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Uplink</p>
+                    <p className="text-2xl font-light text-white tabular-nums">{sysStats.wanUp.toFixed(1)} <span className="text-sm text-zinc-500">Mbps</span></p>
+                    <ProgressBar value={(sysStats.wanUp / 1000) * 100} color="bg-fuchsia-400" />
+                  </div>
+                </div>
+              </GlassCard>
+
+              <div className="grid grid-rows-2 gap-4">
+                <GlassCard glow="fuchsia" className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">DNS Ad-Block</p>
+                    <p className="text-xl font-light text-white">{sysStats.dnsBlocked}</p>
+                  </div>
+                  <Lock size={24} className="text-fuchsia-500/50" />
+                </GlassCard>
+                <GlassCard glow="rose" className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Failed SSO Logins</p>
+                    <p className="text-xl font-light text-rose-400">3 Attempts</p>
+                  </div>
+                  <Shield size={24} className="text-rose-500/50" />
+                </GlassCard>
+              </div>
+            </div>
+          </section>
+
+          {/* ========================================================= */}
+          {/* TIER 3: SMART (AI & Automation)                           */}
+          {/* ========================================================= */}
+          <section className="space-y-4">
+            <h2 className="text-sm font-bold text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Cpu size={18} /> Tier 3: Smart
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[calc(100%-2rem)]">
+              <GlassCard glow="indigo" className="flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Ollama VRAM</span>
+                  <span className="text-[10px] font-bold bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded">Llama3:8b</span>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="relative w-32 h-32 rounded-full border-[4px] border-white/5 flex items-center justify-center shadow-[inset_0_0_20px_rgba(99,102,241,0.2)]">
+                    <svg className="absolute inset-0 w-full h-full -rotate-90">
+                      <circle cx="64" cy="64" r="60" fill="none" stroke="currentColor" strokeWidth="4" className="text-white/5" />
+                      <circle cx="64" cy="64" r="60" fill="none" stroke="currentColor" strokeWidth="4"
+                        className="text-indigo-500"
+                        strokeLinecap="round"
+                        strokeDasharray={377}
+                        strokeDashoffset={377 - (377 * (sysStats.vramUsage / 24))}
+                        style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
+                    </svg>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-white tabular-nums">{sysStats.vramUsage.toFixed(1)}<span className="text-xs text-zinc-500 block">/ 24 GB</span></p>
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Home Actions</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionButton icon={<Activity size={16} />} label="Office Lights" active />
+                  <ActionButton icon={<Lock size={16} />} label="Front Door" active />
+                  <ActionButton icon={<Thermometer size={16} />} label="HVAC 72°" active={false} />
+                  <ActionButton icon={<PowerOff size={16} />} label="Kill Switch" active={false} />
+                </div>
+              </GlassCard>
+            </div>
+          </section>
+        </div>
+
+        {/* ========================================================= */}
+        {/* TIER 4: LIFE (Media)                                      */}
+        {/* ========================================================= */}
+        <section>
+          <h2 className="text-sm font-bold text-purple-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+            <Film size={18} /> Tier 4: Life
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Re-using the official F1 requested movie posters. */}
+              <MediaPoster src="https://image.tmdb.org/t/p/w600_and_h900_bestv2/u2T7IhJwvhIWEdXxbTve2Ew2M3G.jpg" title="Drive to Survive" />
+              <MediaPoster src="https://image.tmdb.org/t/p/w600_and_h900_bestv2/l3n1xZ1oXyM5E8o22ZgqfIt0NnP.jpg" title="Senna" />
+              <MediaPoster src="https://image.tmdb.org/t/p/w600_and_h900_bestv2/uE1wA5kR303O0D10DtvxG5O91Kz.jpg" title="Rush" />
+            </div>
+
+            <div className="space-y-4 flex flex-col">
+              <GlassCard className="flex-1 flex flex-col justify-center text-center items-center">
+                <PlayCircle size={32} className="text-purple-500 mb-3" />
+                <p className="text-4xl font-light text-white mb-1">{sysStats.activeTranscodes}</p>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Transcodes</p>
+              </GlassCard>
+              <GlassCard className="flex-1 flex flex-col justify-center text-center items-center bg-[url('https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center relative overflow-hidden text-white border-white/20">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                <div className="relative z-10 w-full">
+                  <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-1">Immich Memory</p>
+                  <p className="text-sm font-bold truncate">Norway Trip</p>
+                  <p className="text-xs text-white/50">3 Years Ago</p>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================= */}
+        {/* TIER 5: ADMIN (DevOps)                                    */}
+        {/* ========================================================= */}
+        <section>
+          <h2 className="text-sm font-bold text-amber-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+            <Wrench size={18} /> Tier 5: Admin
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <GlassCard className="flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Docker Watchtower</h3>
+                <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center text-xs font-bold">3</span>
+              </div>
+              <div className="space-y-2">
+                <UpdateRow name="jellyfin/jellyfin:latest" />
+                <UpdateRow name="louislam/uptime-kuma:1" />
+                <UpdateRow name="pihole/pihole:latest" />
+              </div>
+            </GlassCard>
+
+            <GlassCard className="lg:col-span-2 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Loki Critical Log Feed</h3>
+                <button className="text-[10px] font-bold text-zinc-500 hover:text-white uppercase tracking-widest">View All</button>
+              </div>
+              <div className="flex-1 bg-[#010101] rounded-xl border border-white/5 p-4 font-mono text-[11px] leading-extralight overflow-y-auto space-y-2 relative">
+                {chaosActive && <div className="text-red-500">[FATAL] CONTAINER KILLED (Chaos Monkey Triggered) -&gt; Target: portainer/portainer-ce</div>}
+                <div className="text-amber-400">[WARN] Nginx: Rate limiting enforced for IP 192.168.1.14</div>
+                <div className="text-zinc-400">[INFO] Authentik: LDAP Sync completed in 2.4s</div>
+                <div className="text-zinc-600">[INFO] Authelia: Session established for user admin</div>
+              </div>
+            </GlassCard>
+          </div>
+        </section>
+
       </main>
     </div>
   );
 }
 
 /** ==========================================
- * UI COMPONENTS
+ * CYBER-GLASS UI COMPONENTS
  * ========================================== */
 
-function NavLink({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function GlassCard({ children, className, glow }: { children: React.ReactNode, className?: string, glow?: 'cyan' | 'fuchsia' | 'emerald' | 'rose' | 'indigo' | 'blue' }) {
+
+  const glowMapping = {
+    cyan: "hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] hover:border-cyan-500/30",
+    fuchsia: "hover:shadow-[0_0_30px_rgba(217,70,239,0.15)] hover:border-fuchsia-500/30",
+    emerald: "hover:border-emerald-500/30",
+    rose: "hover:border-rose-500/30",
+    indigo: "hover:border-indigo-500/30 hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]",
+    blue: "hover:border-blue-500/30"
+  };
+
+  return (
+    <div className={cn(
+      "bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-2xl p-5 md:p-6 transition-all duration-300",
+      glow ? glowMapping[glow] : "hover:border-white/[0.1] hover:bg-white/[0.04]",
+      className
+    )}>
+      {children}
+    </div>
+  );
+}
+
+function ProgressBar({ value, color }: { value: number, color: string }) {
+  return (
+    <div className="mt-2 h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+      <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${value}%` }} />
+    </div>
+  );
+}
+
+function ActionButton({ icon, label, active }: { icon: React.ReactNode, label: string, active: boolean }) {
   return (
     <button className={cn(
-      "flex md:flex-row flex-col items-center md:justify-start justify-center gap-1.5 md:gap-3 p-3 md:px-5 md:py-3.5 rounded-xl md:rounded-2xl transition-all w-full",
-      active ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 font-medium"
+      "p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all",
+      active ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400" : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10"
     )}>
       {icon}
-      <span className="text-[10px] md:text-sm font-bold">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
     </button>
   );
 }
 
-function MetricSummary({ title, value, trend, sub, positive }: { title: string, value: string, trend?: string, sub?: string, positive?: boolean }) {
+function MediaPoster({ src, title }: { src: string, title: string }) {
   return (
-    <div className="bg-[#0a0a0a] rounded-[20px] p-5 md:p-6 border border-zinc-900 flex flex-col justify-between shadow-lg">
-      <h3 className="text-[10px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 md:mb-5">{title}</h3>
-      <div className="flex flex-col gap-1">
-        <p className="text-2xl md:text-4xl font-light text-white tracking-tight tabular-nums relative">
-          {value}
-        </p>
-        {(trend || sub) && (
-          <span className={cn("text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1",
-            trend ? (positive ? "text-emerald-400" : "text-rose-400") : "text-zinc-600"
-          )}>
-            {trend || sub}
-          </span>
-        )}
+    <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-white/10 bg-black/50 group cursor-pointer shadow-xl">
+      <img src={src} alt={title} className="w-full h-full object-cover group-hover:scale-110 group-hover:opacity-60 transition-all duration-700 opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
+      <div className="absolute bottom-4 left-4 right-4">
+        <h4 className="text-white font-bold text-sm truncate">{title}</h4>
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <PlayCircle size={40} className="text-white shadow-2xl drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" />
       </div>
     </div>
   );
 }
 
-function ToggleNode({ title, active, onClick }: { title: string, active: boolean, onClick: () => void }) {
+function UpdateRow({ name }: { name: string }) {
   return (
-    <div onClick={onClick} className="flex items-center justify-between p-3.5 rounded-2xl bg-[#050505] border border-zinc-900 hover:border-zinc-800 cursor-pointer transition-all group select-none">
-      <span className={cn("text-sm font-bold transition-colors", active ? "text-white" : "text-zinc-500 group-hover:text-zinc-400")}>{title}</span>
-      <div className={cn("w-12 h-6 rounded-full relative transition-colors duration-300 flex items-center px-1 border", active ? "bg-indigo-600 border-indigo-500" : "bg-zinc-900 border-zinc-800")}>
-        <div className={cn("w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300", active ? "translate-x-6" : "translate-x-0 bg-zinc-600")} />
-      </div>
-    </div>
-  );
-}
-
-function ThermalsGauge({ value }: { value: number }) {
-  // SVG Arc length math for 180 degree semi-circle
-  const maxStroke = 283;
-  // Map 0-100 to the stroke dashoffset (100 = full arc = 0 offset, 0 = empty arc = maxStroke offset)
-  const offset = maxStroke - (maxStroke * Math.min(Math.max(value, 0), 100) / 100);
-
-  return (
-    <div className="bg-[#0a0a0a] rounded-[20px] p-5 md:p-6 border border-zinc-900 flex flex-col justify-between shadow-lg relative overflow-hidden h-full min-h-[160px]">
-      <div className="flex justify-between items-start mb-2 relative z-10 text-[10px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest">
-        <span>Core Thermal</span>
-        <span className="text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded">Stable</span>
-      </div>
-
-      {/* SVG Dial Chart */}
-      <div className="relative w-full aspect-[2/1] flex items-end justify-center mt-auto">
-        <svg viewBox="0 0 200 100" className="w-full h-auto overflow-visible" aria-hidden="true">
-          {/* Background Track Arc */}
-          <path d="M 10 95 A 90 90 0 0 1 190 95" fill="none" stroke="#18181b" strokeWidth="8" strokeLinecap="round" />
-
-          {/* Tick Marks (0 to 100 in steps of 10 = 11 ticks mapped across 180 degrees) */}
-          {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((tickValue) => {
-            // Convert value to angle (-180 to 0)
-            const angle = -180 + (tickValue / 100) * 180;
-            const rad = (angle * Math.PI) / 180;
-            // Center coordinates
-            const cx = 100;
-            const cy = 95;
-            // Tick length bounds
-            const innerRadius = 75;
-            const outerRadius = 82;
-
-            const x1 = cx + innerRadius * Math.cos(rad);
-            const y1 = cy + innerRadius * Math.sin(rad);
-            const x2 = cx + outerRadius * Math.cos(rad);
-            const y2 = cy + outerRadius * Math.sin(rad);
-
-            const isMajor = tickValue % 25 === 0;
-            return (
-              <line
-                key={tickValue}
-                x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke={tickValue >= 80 ? "#f43f5e" : "#3f3f46"}
-                strokeWidth={isMajor ? "2" : "1"}
-                strokeLinecap="round"
-              />
-            );
-          })}
-
-          {/* Active Colored Arc */}
-          <path
-            d="M 10 95 A 90 90 0 0 1 190 95"
-            fill="none"
-            stroke="url(#thermalGaugeGradient)"
-            strokeWidth="10"
-            strokeLinecap="round"
-            strokeDasharray={maxStroke}
-            strokeDashoffset={offset}
-            className="transition-all duration-1000 ease-out"
-          />
-          {/* Defs for dynamic gradient rendering inside SVG */}
-          <defs>
-            <linearGradient id="thermalGaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#8b5cf6" /> {/* Purple */}
-              <stop offset="50%" stopColor="#ec4899" /> {/* Pink */}
-              <stop offset="100%" stopColor="#f43f5e" /> {/* Rose */}
-            </linearGradient>
-          </defs>
-        </svg>
-
-        {/* Dynamic Number Value in Center */}
-        <div className="absolute bottom-[-10px] w-full flex flex-col items-center">
-          <span className="text-3xl md:text-4xl font-light text-white tracking-tighter tabular-nums drop-shadow-lg">
-            {value}<span className="text-zinc-500 font-medium text-xl ml-0.5">&deg;C</span>
-          </span>
-        </div>
-
-        {/* Min/Max indicators */}
-        <div className="absolute bottom-0 left-1 text-[10px] font-bold text-zinc-600">0&deg;</div>
-        <div className="absolute bottom-0 right-1 text-[10px] font-bold text-rose-500/70">100&deg;</div>
-      </div>
+    <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+      <span className="text-xs font-mono text-zinc-400 truncate pr-4">{name}</span>
+      <button className="text-[10px] font-bold uppercase tracking-widest text-amber-500 bg-amber-500/10 px-2 py-1 rounded hover:bg-amber-500 hover:text-[#030303] transition-colors whitespace-nowrap">
+        Update
+      </button>
     </div>
   );
 }
