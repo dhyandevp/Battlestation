@@ -87,7 +87,7 @@ export default function CommandCenter() {
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
             <Activity size={20} />
           </div>
-          <span className="text-xl font-bold tracking-tight text-white">Homerton</span>
+          <span className="text-xl font-bold tracking-tight text-white">Battle Station</span>
         </div>
 
         {/* Nav Links */}
@@ -127,7 +127,7 @@ export default function CommandCenter() {
         {/* Top Header Row */}
         <header className="px-5 py-4 md:px-10 md:py-8 flex justify-between items-center sticky top-0 bg-[#050505]/80 backdrop-blur-xl z-40 border-b border-zinc-900/50">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">Command Center</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">Battle Station</h1>
             <p className="text-xs md:text-sm text-zinc-500 font-medium flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
               Network Secure &middot; All nodes active
