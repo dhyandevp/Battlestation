@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
 import {
-  Bell, Activity, Lock, Unlock, Zap, Thermometer, Database, Cpu,
-  ChevronRight, MoreHorizontal, LayoutGrid, LayoutList, CheckCircle2, Circle, Plus, Server
+  Bell, Activity, Lock, Zap, Thermometer, Database, Cpu,
+  ChevronRight, MoreHorizontal, LayoutGrid, CheckCircle2, Circle, Plus, Server, Home, Shield, Settings, Calendar as CalendarIcon, Power, HardDrive
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -23,19 +23,16 @@ const INITIAL_TASKS = [
 ];
 
 const HOSTED_APPS = [
-  { name: "Pi-hole", status: "Active", color: "bg-emerald-500/20 text-emerald-400" },
-  { name: "Home Assistant", status: "Active", color: "bg-blue-500/20 text-blue-400" },
-  { name: "Portainer", status: "Active", color: "bg-indigo-500/20 text-indigo-400" },
-  { name: "Uptime Kuma", status: "Degraded", color: "bg-amber-500/20 text-amber-400" },
-  { name: "Nginx Proxy", status: "Active", color: "bg-teal-500/20 text-teal-400" },
-  { name: "Tailscale", status: "Active", color: "bg-zinc-500/20 text-zinc-400" },
-  { name: "Jellyfin", status: "Active", color: "bg-purple-500/20 text-purple-400" },
-  { name: "Vaultwarden", status: "Active", color: "bg-rose-500/20 text-rose-400" },
+  { name: "Pi-hole", status: "Active", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+  { name: "Home Assistant", status: "Active", color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+  { name: "Portainer", status: "Active", color: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
+  { name: "Uptime Kuma", status: "Warning", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+  { name: "Nginx Proxy", status: "Active", color: "text-teal-400 bg-teal-500/10 border-teal-500/20" },
+  { name: "Tailscale", status: "Active", color: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20" },
 ];
 
 export default function CommandCenter() {
   const [metrics, setMetrics] = useState<any>(null);
-  const [locks, setLocks] = useState({ front: true, bedroom: false, garage: true });
   const [toggles, setToggles] = useState({ proxy: true, dns: true, vpn: false });
 
   const [mounted, setMounted] = useState(false);
@@ -48,6 +45,7 @@ export default function CommandCenter() {
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
+    // Initial fetch
     fetcher('/api/metrics').then(setMetrics).catch(() => { });
     const metricsTimer = setInterval(() => {
       fetcher('/api/metrics').then(setMetrics).catch(() => { });
@@ -64,280 +62,245 @@ export default function CommandCenter() {
   };
 
   const executeAction = async (actionId: string) => {
-    // Optimistic UI toggle for demo purposes
     if (actionId === 'proxy') setToggles(p => ({ ...p, proxy: !p.proxy }));
     if (actionId === 'dns') setToggles(p => ({ ...p, dns: !p.dns }));
     if (actionId === 'vpn') setToggles(p => ({ ...p, vpn: !p.vpn }));
-
-    // Trigger backend hook
-    await fetch('/api/docker-control', {
-      method: 'POST',
-      body: JSON.stringify({ action: actionId })
-    }).catch(e => console.error("Action failed:", e));
+    try {
+      await fetch('/api/docker-control', {
+        method: 'POST',
+        body: JSON.stringify({ action: actionId })
+      });
+    } catch (e) { console.error("Action failed:", e); }
   };
 
   return (
-    // Deep black/zinc-950 background for True Dark Mode
-    <div className="min-h-screen bg-black text-zinc-100 font-sans p-4 md:p-6 lg:p-10 flex justify-center items-start">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans flex flex-col md:flex-row overflow-hidden selection:bg-indigo-500/30">
 
-      {/* Outer Shell - Subtle border, deep shadows */}
-      <main className="w-full max-w-[1536px] bg-zinc-950 rounded-[40px] shadow-2xl border border-zinc-800/50 p-6 md:p-10 flex flex-col gap-8 relative overflow-hidden ring-1 ring-white/5">
+      {/* 
+        ==============================
+        SIDEBAR (Desktop) / BOTTOM BAR (Mobile)
+        ==============================
+      */}
+      <nav className="fixed bottom-0 w-full md:relative md:w-[240px] lg:w-[280px] bg-[#0a0a0a] border-t md:border-t-0 md:border-r border-zinc-900 flex md:flex-col justify-between md:justify-start z-50 p-4 md:p-6 md:h-screen">
+        {/* Logo - Hidden on mobile */}
+        <div className="hidden md:flex items-center gap-3 mb-10 pl-2">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+            <Activity size={20} />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white">Homerton</span>
+        </div>
 
-        {/* Soft elegant glows inside the dark boundary */}
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-500/5 blur-[150px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-emerald-500/5 blur-[150px] rounded-full pointer-events-none" />
+        {/* Nav Links */}
+        <div className="flex md:flex-col gap-2 w-full justify-around md:justify-start">
+          <NavLink icon={<Home size={20} />} label="Dashboard" active />
+          <NavLink icon={<HardDrive size={20} />} label="Infrastructure" />
+          <NavLink icon={<CalendarIcon size={20} />} label="Schedules" />
+          <NavLink icon={<Settings size={20} />} label="Settings" />
+        </div>
 
-        {/* --- NAVBAR --- */}
-        <header className="flex justify-between items-center pb-6 border-b border-zinc-900 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-              <Activity size={20} />
+        {/* Bottom Action - Hidden on mobile */}
+        <div className="hidden md:flex flex-col gap-4 mt-auto">
+          <div className="p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800/80 hover:bg-zinc-900 transition-colors cursor-pointer group flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-500 to-orange-500 flex items-center justify-center">
+                <Power size={14} className="text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">System Power</p>
+                <p className="text-xs text-emerald-500 font-medium">Nominal Draw</p>
+              </div>
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">Homerton <span className="text-zinc-500 font-medium">OS</span></span>
+          </div>
+        </div>
+      </nav>
+
+      {/* 
+        ==============================
+        MAIN DASHBOARD CONTENT
+        ==============================
+      */}
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto pb-24 md:pb-0 relative">
+
+        {/* Subtle Background Glows */}
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none hidden md:block" />
+
+        {/* Top Header Row */}
+        <header className="px-5 py-4 md:px-10 md:py-8 flex justify-between items-center sticky top-0 bg-[#050505]/80 backdrop-blur-xl z-40 border-b border-zinc-900/50">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">Command Center</h1>
+            <p className="text-xs md:text-sm text-zinc-500 font-medium flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+              Network Secure &middot; All nodes active
+            </p>
           </div>
 
-          {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-2 bg-zinc-900/50 p-1.5 rounded-2xl border border-zinc-800" aria-label="Main Navigation">
-            <a href="#" className="text-white bg-zinc-800 px-5 py-2 rounded-xl text-sm font-medium shadow-sm border border-zinc-700">Overview</a>
-            <a href="#" className="text-zinc-400 hover:text-white px-5 py-2 rounded-xl text-sm font-medium transition-colors">Network</a>
-            <a href="#" className="text-zinc-400 hover:text-white px-5 py-2 rounded-xl text-sm font-medium transition-colors">Storage</a>
-            <a href="#" className="text-zinc-400 hover:text-white px-5 py-2 rounded-xl text-sm font-medium transition-colors">Settings</a>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            <button aria-label="Notifications" className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center hover:bg-zinc-800 transition-colors focus:ring-2 focus:ring-indigo-500 relative">
-              <Bell size={18} className="text-zinc-300" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-zinc-900" />
-            </button>
-            {/* Avatar */}
-            <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-700 overflow-hidden flex items-center justify-center">
-              <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-500 opacity-80" />
+          {/* BIG LIVE CLOCK */}
+          <div className="bg-zinc-900/50 px-5 py-2.5 rounded-2xl border border-zinc-800/80 hidden lg:flex items-center gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-2xl font-light tabular-nums text-white tracking-tight leading-none mb-1">
+                {mounted && time ? format(time, "HH:mm") : "--:--"}
+                <span className="text-zinc-500 font-medium ml-1 text-base">{mounted && time ? format(time, "ss") : "--"}</span>
+              </span>
+              <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-widest leading-none">
+                {mounted && time ? format(time, "EEE, MMM do") : "--"}
+              </span>
             </div>
+            <div className="w-[1px] h-8 bg-zinc-800" />
+            <button className="text-zinc-400 hover:text-white transition w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900/80 border border-zinc-800">
+              <Bell size={18} />
+            </button>
+          </div>
+
+          {/* Mobile Only Clock */}
+          <div className="md:hidden text-right">
+            <span className="text-xl font-light text-white">{mounted && time ? format(time, "HH:mm") : "--:--"}</span>
           </div>
         </header>
 
-        {/* --- DASHBOARD GRID --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 relative z-10 mt-2">
+        {/* Dashboard Grid Container */}
+        <div className="p-4 md:p-8 flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
 
-          {/* LEFT 8 COLUMNS: Stats, Feeds, Action grids */}
-          <section className="lg:col-span-8 flex flex-col gap-8">
+          {/* Row 1: Key Summary Metrics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <MetricSummary title="Uplink Traffic" value="842 Mbps" trend="+12%" positive />
+            <MetricSummary title="System Load" value={`${metrics?.loadAvg || '1.24'}`} sub="Proxmox Node" />
+            <MetricSummary title="Core Thermal" value={`${metrics?.cpuTemp || 45}°C`} sub="Stable Cooling" />
+            <MetricSummary title="DNS Queries" value="142k" trend="12% Blocked" positive={false} />
+          </div>
 
-            {/* Hero Header & Live Clock */}
-            <article className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-zinc-900/30 p-8 rounded-[32px] border border-zinc-800/80">
-              <div>
-                <h1 className="text-4xl lg:text-5xl font-semibold tracking-tight text-white mb-2">
-                  System Nominal
-                </h1>
-                <p className="text-zinc-400 font-medium text-sm lg:text-base flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                  All endpoints reporting secure handshakes.
-                </p>
+          {/* Row 2: Live View & Side Modules */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+            {/* Rack Live View - 8 Cols */}
+            <div className="xl:col-span-8 bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] border border-zinc-900 overflow-hidden relative min-h-[250px] md:min-h-[400px] flex flex-col shadow-xl">
+              <div className="p-4 md:p-5 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent absolute top-0 w-full z-10">
+                <div className="flex items-center gap-3">
+                  <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]" />
+                    Server Alpha
+                  </div>
+                </div>
+                <button className="w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition backdrop-blur-md">
+                  <MoreHorizontal size={18} />
+                </button>
               </div>
 
-              <div aria-live="polite" className="text-left md:text-right bg-zinc-950/50 px-6 py-4 rounded-2xl border border-zinc-800/50 backdrop-blur-md">
-                <p className="text-4xl lg:text-5xl font-light tracking-tighter text-white tabular-nums drop-shadow-md">
-                  {mounted && time ? format(time, "HH:mm") : "--:--"}
-                  <span className="text-2xl text-zinc-500 font-medium ml-1">
-                    {mounted && time ? format(time, "ss") : "--"}
-                  </span>
-                </p>
-                <h2 className="text-xs font-bold text-indigo-400 tracking-widest uppercase mt-2">Local Edge Time &middot; {mounted && time ? format(time, "E, MMM do") : ""}</h2>
+              {/* Simulated Camera Feed pattern */}
+              <div className="flex-1 w-full h-full relative flex justify-center items-center bg-black/80">
+                <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] bg-[size:32px_32px]" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 md:w-48 h-32 md:h-48 border border-zinc-800/50 rounded-full flex items-center justify-center">
+                  <div className="absolute inset-0 bg-indigo-500/10 blur-[40px] rounded-full" />
+                  <div className="w-full h-[1px] bg-zinc-800/30 absolute" />
+                  <div className="h-full w-[1px] bg-zinc-800/30 absolute" />
+                  <div className="w-2 h-2 rounded-full bg-indigo-500/80 shadow-[0_0_15px_rgba(99,102,241,1)]" />
+                </div>
               </div>
-            </article>
-
-            {/* Core Metrics Cards (Responsive 1 col mobile, 3 col desktop) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <MetricCard title="Network Uplink" value="98.4 Gbps" subvalue="Stable" icon={<Activity size={18} className="text-emerald-500" />} />
-              <MetricCard title="Proxmox Load" value={`${metrics?.loadAvg || '1.24'} Avg`} subvalue="Core 0-15" icon={<Cpu size={18} className="text-blue-500" />} />
-              <MetricCard title="DNS Queries" value="142.1k" subvalue="12% Blocked" icon={<Database size={18} className="text-indigo-500" />} />
             </div>
 
-            {/* Middle Split: Camera Feed & Action Toggles */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            {/* Task Sidebar column - 4 Cols */}
+            <div className="xl:col-span-4 flex flex-col gap-6 md:gap-6">
 
-              {/* Rack Live View (7 cols) */}
-              <div className="md:col-span-12 lg:col-span-7 relative rounded-[32px] overflow-hidden bg-zinc-950 h-[320px] shadow-2xl ring-1 ring-zinc-800">
-                <div className="absolute inset-x-0 top-0 p-5 flex justify-between items-start z-10 bg-gradient-to-b from-black/80 to-transparent">
-                  <div className="bg-black/60 backdrop-blur-xl px-4 py-2 rounded-full flex items-center gap-3 border border-white/10 shadow-lg">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)] animate-pulse" aria-hidden="true" />
-                    <span className="text-xs font-bold tracking-wide text-white uppercase">Server Room Alpha</span>
-                  </div>
-                  <button className="bg-black/40 p-2 rounded-full text-white hover:bg-black/60 transition"><MoreHorizontal size={18} /></button>
+              {/* Calendar Integration */}
+              <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-6 border border-zinc-900 shadow-xl">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <CalendarIcon size={18} className="text-indigo-500" /> Auto-Deploy
+                  </h3>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900 px-2 py-1 rounded-md">
+                    {mounted && time ? format(time, "MMMM") : "---"}
+                  </span>
                 </div>
-                {/* Simulated Camera Feed pattern */}
-                <div className="w-full h-full relative flex items-center justify-center">
-                  {/* Background Grid */}
-                  <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] bg-[size:24px_24px]" />
-                  {/* Center Reticle */}
-                  <div className="w-32 h-32 border border-zinc-800/50 rounded-full flex items-center justify-center relative">
-                    <div className="absolute inset-0 bg-indigo-500/5 rounded-full blur-2xl" />
-                    <div className="w-2 h-2 bg-indigo-500/50 rounded-full" />
-                    <div className="absolute left-[-20px] right-[-20px] h-[1px] bg-zinc-800/30" />
-                    <div className="absolute top-[-20px] bottom-[-20px] w-[1px] bg-zinc-800/30" />
-                  </div>
+                {/* Visual mini-calendar */}
+                <div className="grid grid-cols-7 gap-1 md:gap-2 text-center">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <span key={d} className="text-[10px] font-bold text-zinc-600 mb-2">{d}</span>)}
+                  {mounted && time && (() => {
+                    const start = startOfMonth(time);
+                    const end = endOfMonth(time);
+                    const days = eachDayOfInterval({ start, end });
+                    const blanks = Array(start.getDay()).fill(null);
+                    return [...blanks, ...days].map((day, i) => {
+                      if (!day) return <div key={i} className="aspect-square" />;
+                      const isToday = isSameDay(day, time);
+                      return (
+                        <div key={i} className={cn(
+                          "text-xs md:text-sm aspect-square flex items-center justify-center rounded-xl font-medium transition-all",
+                          isToday ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-110 relative z-10" : "text-zinc-400 hover:bg-zinc-800 hover:text-white cursor-pointer"
+                        )}>
+                          {format(day, "d")}
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
 
-              {/* Action Toggles (Interactive) (5 cols) */}
-              <div className="md:col-span-12 lg:col-span-5 flex flex-col gap-4">
-                <h3 className="text-sm font-semibold text-zinc-100 mb-1 px-1">Infrastructure Hub</h3>
-                <InteractiveToggle
-                  title="Nginx Reverse Proxy"
-                  desc="Port 80/443 Traffic Routing"
-                  active={toggles.proxy}
-                  onClick={() => executeAction('proxy')}
-                />
-                <InteractiveToggle
-                  title="Pi-hole DNS Engine"
-                  desc="Network ad & tracker blocking"
-                  active={toggles.dns}
-                  onClick={() => executeAction('dns')}
-                />
-                <InteractiveToggle
-                  title="Tailscale Subnet Exit"
-                  desc="Remote access routing"
-                  active={toggles.vpn}
-                  onClick={() => executeAction('vpn')}
-                />
+              {/* Infrastructure Gateways - Toggles */}
+              <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-6 border border-zinc-900 shadow-xl flex flex-col gap-3 flex-1">
+                <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
+                  <Shield size={18} className="text-indigo-500" /> Active Tunnels
+                </h3>
+                <ToggleNode title="Nginx Proxy Entry" active={toggles.proxy} onClick={() => executeAction('proxy')} />
+                <ToggleNode title="Pi-Hole DNS Sink" active={toggles.dns} onClick={() => executeAction('dns')} />
+                <ToggleNode title="Tailscale Subnet" active={toggles.vpn} onClick={() => executeAction('vpn')} />
               </div>
 
             </div>
 
-            {/* Application Drawer */}
-            <section aria-label="Hosted Applications" className="mt-2">
-              <div className="flex justify-between items-center mb-6 px-1">
-                <h3 className="text-lg font-bold text-white tracking-tight">Hosted Services</h3>
-                <div className="flex gap-2">
-                  <button className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition"><LayoutGrid size={16} /></button>
-                  <button className="p-2 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-500 hover:text-white transition"><LayoutList size={16} /></button>
-                </div>
-              </div>
+          </div>
 
-              {/* Responsive grid scrolling for mobile, wrapping for desktop */}
-              <div className="flex overflow-x-auto pb-4 gap-4 lg:grid lg:grid-cols-4 lg:overflow-visible scrollbar-hide snap-x">
-                {HOSTED_APPS.map((app, i) => (
-                  <div
-                    key={i}
-                    role="button"
-                    tabIndex={0}
-                    className="snap-start min-w-[160px] bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-5 flex flex-col gap-4 hover:bg-zinc-800 transition-colors cursor-pointer group"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center border border-white/5", app.color)} aria-hidden="true">
-                        <Server size={20} />
-                      </div>
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-zinc-100 group-hover:text-white transition">{app.name}</p>
-                      <p className="text-[11px] font-medium text-zinc-500 mt-1 uppercase tracking-wider">{app.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+          {/* Row 3: Bottom Sections (Services and Tasks) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          </section>
-
-          {/* RIGHT 4 COLUMNS: Sidebar (Temp, Tasks, Calendar) */}
-          <aside className="lg:col-span-4 flex flex-col gap-6">
-
-            {/* Thermals Dial - Clean CSS rotation */}
-            <section className="bg-zinc-900/40 border border-zinc-800/80 rounded-[32px] p-8 relative overflow-hidden" aria-label="System Telemetry">
-              <div className="flex justify-between items-start mb-8 relative z-10">
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Core Thermals</h3>
-                  <p className="text-xs font-medium text-zinc-500 mt-1 uppercase tracking-wider">Proxmox Cluster</p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
-                  <Thermometer size={18} />
-                </div>
-              </div>
-
-              {/* Dial Implementation for Dark Mode */}
-              <div className="relative w-full aspect-[2/1] flex items-end justify-center overflow-hidden mb-4">
-                <svg viewBox="0 0 200 100" className="w-full absolute bottom-0" aria-hidden="true">
-                  {/* Background Track */}
-                  <path d="M 15 95 A 85 85 0 0 1 185 95" fill="none" stroke="#27272a" strokeWidth="8" strokeLinecap="round" />
-
-                  {/* Ticks */}
-                  {[...Array(21)].map((_, i) => {
-                    const angle = (i * 9) + 180;
-                    const rad = (angle * Math.PI) / 180;
-                    const x1 = 100 + 72 * Math.cos(rad);
-                    const y1 = 95 + 72 * Math.sin(rad);
-                    const x2 = 100 + 76 * Math.cos(rad);
-                    const y2 = 95 + 76 * Math.sin(rad);
-                    return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3f3f46" strokeWidth="2" strokeLinecap="round" />
-                  })}
-
-                  {/* Active Thermal Bar */}
-                  <path
-                    d="M 15 95 A 85 85 0 0 1 185 95"
-                    fill="none"
-                    stroke="url(#thermalGradient)"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeDasharray="267"
-                    // 45 degrees out of 100 max mapped to 267 dash length
-                    strokeDashoffset={267 - (267 * (metrics?.cpuTemp || 45) / 100)}
-                    className="transition-all duration-1000 ease-out"
-                  />
-                  <defs>
-                    <linearGradient id="thermalGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#8b5cf6" /> {/* Purple */}
-                      <stop offset="50%" stopColor="#ec4899" /> {/* Pink */}
-                      <stop offset="100%" stopColor="#f43f5e" /> {/* Rose */}
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute bottom-1 flex flex-col items-center">
-                  <span className="text-5xl font-light text-white tabular-nums tracking-tighter shadow-black drop-shadow-lg">
-                    {metrics?.cpuTemp || 45}&deg;
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {/* Task Manager Widget - Interactive list */}
-            <div className="bg-zinc-900/40 rounded-[32px] p-6 lg:p-8 border border-zinc-800/80 flex flex-col h-full min-h-[300px]">
+            {/* Hosted Services Grid */}
+            <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-zinc-900 shadow-xl flex flex-col">
               <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Active Tasks</h3>
-                  <p className="text-xs font-medium text-zinc-500 mt-1 uppercase tracking-wider">Root Access</p>
-                </div>
-                <button className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-300 flex items-center justify-center hover:bg-zinc-700 hover:text-white transition"><Plus size={16} /></button>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Database size={18} className="text-indigo-500" /> Hosted Apps
+                </h3>
+                <LayoutGrid size={18} className="text-zinc-500" />
               </div>
 
-              <ul className="flex-1 space-y-4" role="list">
-                {tasks.map(task => (
-                  <li key={task.id}
-                    onClick={() => toggleTask(task.id)}
-                    className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-800/50 transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full"
-                        aria-label={task.done ? "Mark task incomplete" : "Mark task complete"}
-                      >
-                        {task.done
-                          ? <CheckCircle2 size={20} className="text-indigo-500" />
-                          : <Circle size={20} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
-                        }
-                      </button>
-                      <span className={cn(
-                        "text-sm transition-all duration-300",
-                        task.done ? 'text-zinc-600 line-through' : 'text-zinc-200 font-medium group-hover:text-white'
-                      )}>
-                        {task.text}
-                      </span>
+              {/* Mobile wrap, Desktop rigid grid */}
+              <div className="flex flex-wrap md:grid md:grid-cols-3 gap-3">
+                {HOSTED_APPS.map((app, i) => (
+                  <div key={i} className={cn(
+                    "w-[48%] md:w-auto p-4 rounded-2xl bg-[#050505] border hover:border-zinc-700 transition-colors cursor-pointer group flex flex-col items-center text-center",
+                    app.color.split("border-")[1] ? `border-${app.color.split("border-")[1]}` : "border-zinc-900"
+                  )}>
+                    <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-3", app.color.split(" border")[0])}>
+                      <Server size={20} />
                     </div>
-                  </li>
+                    <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors">{app.name}</p>
+                    <p className={cn("text-[10px] md:text-xs uppercase tracking-widest font-bold mt-1", app.status === 'Active' ? 'text-emerald-500/70' : 'text-amber-500/70')}>{app.status}</p>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
 
-          </aside>
+            {/* Maintenance Tasks Tracking */}
+            <div className="bg-[#0a0a0a] rounded-[24px] md:rounded-[32px] p-5 md:p-8 border border-zinc-900 shadow-xl flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Zap size={18} className="text-indigo-500" /> Maintenance
+                </h3>
+                <button className="text-zinc-100 bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-lg shadow-indigo-500/20">
+                  <Plus size={14} /> Add Log
+                </button>
+              </div>
+              <div className="space-y-3">
+                {tasks.map(task => (
+                  <div key={task.id} onClick={() => toggleTask(task.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#050505] border border-zinc-900 hover:border-zinc-800 cursor-pointer group transition-all">
+                    <button className="focus:outline-none flex-shrink-0">
+                      {task.done ? <CheckCircle2 size={20} className="text-emerald-500" /> : <Circle size={20} className="text-zinc-600 group-hover:text-zinc-400" />}
+                    </button>
+                    <span className={cn("text-sm transition-all", task.done ? "text-zinc-600 line-through" : "text-zinc-200 font-medium group-hover:text-white")}>{task.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </main>
     </div>
@@ -345,54 +308,47 @@ export default function CommandCenter() {
 }
 
 /** ==========================================
- * PURE SUB-COMPONENTS
+ * UI COMPONENTS
  * ========================================== */
 
-function MetricCard({ title, value, subvalue, icon }: { title: string, value: string, subvalue: string, icon: React.ReactNode }) {
+function NavLink({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-3xl p-6 flex flex-col justify-between hover:bg-zinc-800/80 transition-colors cursor-pointer group">
-      <div className="flex justify-between items-start mb-6">
-        <div className="w-10 h-10 rounded-full bg-zinc-950 flex items-center justify-center border border-zinc-800">
-          {icon}
-        </div>
-      </div>
-      <div>
-        <p className="text-3xl font-light text-white tracking-tight tabular-nums mb-1">{value}</p>
-        <div className="flex justify-between items-end">
-          <h3 className="text-sm font-bold text-zinc-400 group-hover:text-zinc-300 transition-colors">{title}</h3>
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest bg-zinc-950 px-2 py-1 rounded-md">{subvalue}</span>
-        </div>
+    <button className={cn(
+      "flex md:flex-row flex-col items-center md:justify-start justify-center gap-1.5 md:gap-3 p-3 md:px-5 md:py-3.5 rounded-xl md:rounded-2xl transition-all w-full",
+      active ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 font-medium"
+    )}>
+      {icon}
+      <span className="text-[10px] md:text-sm font-bold">{label}</span>
+    </button>
+  );
+}
+
+function MetricSummary({ title, value, trend, sub, positive }: { title: string, value: string, trend?: string, sub?: string, positive?: boolean }) {
+  return (
+    <div className="bg-[#0a0a0a] rounded-[20px] p-5 md:p-6 border border-zinc-900 flex flex-col justify-between shadow-lg">
+      <h3 className="text-[10px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 md:mb-5">{title}</h3>
+      <div className="flex flex-col gap-1">
+        <p className="text-2xl md:text-4xl font-light text-white tracking-tight tabular-nums relative">
+          {value}
+        </p>
+        {(trend || sub) && (
+          <span className={cn("text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1",
+            trend ? (positive ? "text-emerald-400" : "text-rose-400") : "text-zinc-600"
+          )}>
+            {trend || sub}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-function InteractiveToggle({ title, desc, active, onClick }: { title: string, desc: string, active: boolean, onClick: () => void }) {
+function ToggleNode({ title, active, onClick }: { title: string, active: boolean, onClick: () => void }) {
   return (
-    <div
-      onClick={onClick}
-      role="switch"
-      aria-checked={active}
-      tabIndex={0}
-      className={cn(
-        "p-4 rounded-2xl flex items-center justify-between cursor-pointer transition-all border outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent",
-        active ? "bg-indigo-500/10 border-indigo-500/30" : "bg-zinc-900 border-zinc-800/80 hover:bg-zinc-800"
-      )}
-    >
-      <div>
-        <h4 className={cn("text-sm font-bold transition-colors", active ? "text-indigo-400" : "text-zinc-200")}>{title}</h4>
-        <p className="text-xs text-zinc-500 font-medium mt-1">{desc}</p>
-      </div>
-
-      {/* iOS style toggle switch visually built for Dark Mode */}
-      <div className={cn(
-        "w-12 h-6 rounded-full relative transition-colors duration-300 flex items-center px-1",
-        active ? "bg-indigo-500" : "bg-zinc-950 border border-zinc-800"
-      )}>
-        <div className={cn(
-          "w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300",
-          active ? "translate-x-6" : "translate-x-0 bg-zinc-500"
-        )} />
+    <div onClick={onClick} className="flex items-center justify-between p-3.5 rounded-2xl bg-[#050505] border border-zinc-900 hover:border-zinc-800 cursor-pointer transition-all group">
+      <span className={cn("text-sm font-bold transition-colors", active ? "text-white" : "text-zinc-500 group-hover:text-zinc-400")}>{title}</span>
+      <div className={cn("w-12 h-6 rounded-full relative transition-colors duration-300 flex items-center px-1 border", active ? "bg-indigo-600 border-indigo-500" : "bg-zinc-900 border-zinc-800")}>
+        <div className={cn("w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300", active ? "translate-x-6" : "translate-x-0 bg-zinc-600")} />
       </div>
     </div>
   );
