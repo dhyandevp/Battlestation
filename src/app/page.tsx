@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import useSWR from "swr";
 import { format } from "date-fns";
 import {
   Bell, Activity, Lock, Unlock,
@@ -35,7 +34,7 @@ const HOSTED_APPS = [
  * MAIN VIEW
  * ========================================== */
 export default function CommandCenter() {
-  const { data: metrics } = useSWR('/api/metrics', fetcher, { refreshInterval: 5000 });
+  const [metrics, setMetrics] = useState<any>(null);
   const [locks, setLocks] = useState({ front: true, bedroom: false, garage: true });
 
   // Mounted check for hydration safety with Date
@@ -46,8 +45,20 @@ export default function CommandCenter() {
   useEffect(() => {
     setMounted(true);
     setTime(new Date());
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
+
+    // Clock Timer
+    const clockTimer = setInterval(() => setTime(new Date()), 1000);
+
+    // Metrics Polling
+    fetcher('/api/metrics').then(setMetrics).catch(() => { });
+    const metricsTimer = setInterval(() => {
+      fetcher('/api/metrics').then(setMetrics).catch(() => { });
+    }, 5000);
+
+    return () => {
+      clearInterval(clockTimer);
+      clearInterval(metricsTimer);
+    };
   }, []);
 
   const toggleTask = (id: number) => {
