@@ -80,7 +80,22 @@ export default function GodTierCommandCenter() {
     }
   };
 
-  const currentMonthlyCost = ((sysStats.upsWatts / 1000) * 24 * 30 * sysStats.costPerKwh).toFixed(2);
+  const triggerHomeAssistant = async (entityId: string) => {
+    // Optimistic UI update could go here
+    try {
+      await fetch('/api/god-tier-metrics', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'ha_toggle', entity_id: entityId })
+      });
+    } catch (e) {
+      console.error("Failed to toggle HA entity", e);
+    }
+  };
+
+  // Prevent NaN crashes on initial empty renders
+  const currentMonthlyCost = sysStats?.upsWatts && sysStats?.costPerKwh
+    ? ((sysStats.upsWatts / 1000) * 24 * 30 * sysStats.costPerKwh).toFixed(2)
+    : "0.00";
 
   return (
     <div className={cn(
@@ -279,10 +294,10 @@ export default function GodTierCommandCenter() {
                   <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Home Actions</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <ActionButton icon={<Activity size={16} />} label="Office Lights" active />
-                  <ActionButton icon={<Lock size={16} />} label="Front Door" active />
-                  <ActionButton icon={<Thermometer size={16} />} label="HVAC 72°" active={false} />
-                  <ActionButton icon={<PowerOff size={16} />} label="Kill Switch" active={false} />
+                  <ActionButton icon={<Activity size={16} />} label="Office Lights" active onClick={() => triggerHomeAssistant('light.office_lights')} />
+                  <ActionButton icon={<Lock size={16} />} label="Front Door" active onClick={() => triggerHomeAssistant('lock.front_door')} />
+                  <ActionButton icon={<Thermometer size={16} />} label="HVAC 72°" active={false} onClick={() => triggerHomeAssistant('climate.home')} />
+                  <ActionButton icon={<PowerOff size={16} />} label="Kill Switch" active={false} onClick={() => triggerHomeAssistant('script.kill_switch')} />
                 </div>
               </GlassCard>
             </div>
@@ -396,9 +411,9 @@ function ProgressBar({ value, color }: { value: number, color: string }) {
   );
 }
 
-function ActionButton({ icon, label, active }: { icon: React.ReactNode, label: string, active: boolean }) {
+function ActionButton({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick?: () => void }) {
   return (
-    <button className={cn(
+    <button onClick={onClick} className={cn(
       "p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all",
       active ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400" : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10"
     )}>
